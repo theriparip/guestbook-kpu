@@ -5,6 +5,7 @@ import Webcam from 'react-webcam';
 import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { FaCamera, FaRegAddressBook } from 'react-icons/fa';
+import { sanitizeInput, validatePhoneNumber, validateLength } from '@/lib/utils';
 
 export default function GuestForm() {
   const [formData, setFormData] = useState({
@@ -75,14 +76,53 @@ export default function GuestForm() {
       return;
     }
 
+    // Validasi input
+    if (!validateLength(formData.nama, 2, 100)) {
+      setMessage({
+        type: 'error',
+        text: 'Nama harus memiliki panjang 2-100 karakter.',
+      });
+      return;
+    }
+
+    if (formData.telepon && !validatePhoneNumber(formData.telepon)) {
+      setMessage({
+        type: 'error',
+        text: 'Format nomor telepon tidak valid. Contoh: 081234567890',
+      });
+      return;
+    }
+
+    if (!validateLength(formData.perusahaan, 0, 200)) {
+      setMessage({
+        type: 'error',
+        text: 'Nama perusahaan maksimal 200 karakter.',
+      });
+      return;
+    }
+
+    if (formData.tujuan === 'LAINNYA' && !validateLength(formData.tujuanLainnya, 3, 200)) {
+      setMessage({
+        type: 'error',
+        text: 'Tujuan kunjungan harus memiliki panjang 3-200 karakter.',
+      });
+      return;
+    }
+
     setLoading(true);
     setMessage({ type: '', text: '' });
 
     try {
+      // Sanitize input
+      const sanitizedNama = sanitizeInput(formData.nama);
+      const sanitizedTelepon = sanitizeInput(formData.telepon);
+      const sanitizedPerusahaan = sanitizeInput(formData.perusahaan);
+      const sanitizedKataKunci = sanitizeInput(formData.kataKunci);
+
       const keywordQuery = query(
         collection(db, 'keywords'),
         where('active', '==', true),
-        where('keyword', '==', formData.kataKunci.toLowerCase())
+        where('keyword', '==', sanitizedKataKunci.toLowerCase())
       );
       const keywordSnapshot = await getDocs(keywordQuery);
 
@@ -94,14 +134,14 @@ export default function GuestForm() {
 
       const tujuanAkhir =
         formData.tujuan === 'LAINNYA'
-          ? formData.tujuanLainnya
+          ? sanitizeInput(formData.tujuanLainnya)
           : tujuanOptions.find((opt) => opt.value === formData.tujuan)?.label ||
             formData.tujuan;
 
       await addDoc(collection(db, 'guests'), {
-        nama: formData.nama,
-        telepon: formData.telepon,
-        perusahaan: formData.perusahaan,
+        nama: sanitizedNama,
+        telepon: sanitizedTelepon,
+        perusahaan: sanitizedPerusahaan,
         tujuan: tujuanAkhir,
         photoURL: photo,
         timestamp: new Date(),
@@ -203,6 +243,7 @@ export default function GuestForm() {
                     <button
                       type="button"
                       onClick={capturePhoto}
+                      aria-label={cameraActive ? 'Ambil Foto' : 'Aktifkan Kamera'}
                       className={`mt-4 w-full text-white font-semibold py-2 px-4 rounded-xl shadow-lg ${
                         cameraActive
                           ? 'bg-green-600 hover:bg-green-700'
@@ -239,17 +280,17 @@ export default function GuestForm() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Nama Lengkap *</label>
-                  <input type="text" name="nama" value={formData.nama} onChange={handleChange} required placeholder="Masukkan nama lengkap" className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+                  <input type="text" name="nama" value={formData.nama} onChange={handleChange} required placeholder="Masukkan nama lengkap" aria-label="Nama Lengkap" className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent" />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Nomor Telepon</label>
-                  <input type="tel" name="telepon" value={formData.telepon} onChange={handleChange} placeholder="08123456789" className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+                  <input type="tel" name="telepon" value={formData.telepon} onChange={handleChange} placeholder="08123456789" aria-label="Nomor Telepon" className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent" />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Nama Perusahaan / Instansi Asal</label>
-                  <input type="text" name="perusahaan" value={formData.perusahaan} onChange={handleChange} placeholder="Nama perusahaan atau instansi" className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+                  <input type="text" name="perusahaan" value={formData.perusahaan} onChange={handleChange} placeholder="Nama perusahaan atau instansi" aria-label="Nama Perusahaan atau Instansi" className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent" />
                 </div>
               </div>
 
@@ -260,7 +301,7 @@ export default function GuestForm() {
                   🎯 Tujuan Kunjungan
                 </label>
 
-                <select name="tujuan" value={formData.tujuan} onChange={handleChange} required className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent">
+                <select name="tujuan" value={formData.tujuan} onChange={handleChange} required aria-label="Tujuan Kunjungan" className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent">
                   <option value="">-- Pilih Jenis Layanan --</option>
                   {tujuanOptions.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -277,14 +318,14 @@ export default function GuestForm() {
                   }`}
                 >
                   <label className="block text-sm font-medium text-gray-700 mb-2">Sebutkan Layanan Lainnya *</label>
-                  <input type="text" name="tujuanLainnya" value={formData.tujuanLainnya} onChange={handleChange} required={formData.tujuan === 'LAINNYA'} placeholder="Contoh: Konsultasi data pemilih" className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+                  <input type="text" name="tujuanLainnya" value={formData.tujuanLainnya} onChange={handleChange} required={formData.tujuan === 'LAINNYA'} placeholder="Contoh: Konsultasi data pemilih" aria-label="Tujuan Kunjungan Lainnya" className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent" />
                 </div>
               </div>
 
               {/* Kata Kunci */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Kata Kunci *</label>
-                <input type="password" name="kataKunci" value={formData.kataKunci} onChange={handleChange} required placeholder="Tanyakan kepada petugas piket" className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+                <input type="password" name="kataKunci" value={formData.kataKunci} onChange={handleChange} required placeholder="Tanyakan kepada petugas piket" aria-label="Kata Kunci" className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-transparent" />
               </div>
 
               {/* Pesan */}
@@ -299,7 +340,7 @@ export default function GuestForm() {
               )}
 
               {/* Tombol Submit */}
-              <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition duration-300">
+              <button type="submit" disabled={loading} aria-label="Kirim Kunjungan" className="w-full bg-gradient-to-r from-red-600 to-red-700 text-white font-bold py-4 px-6 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition duration-300">
                 {loading ? 'Menyimpan...' : 'Kirim Kunjungan'}
               </button>
             </div>
