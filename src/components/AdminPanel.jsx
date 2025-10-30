@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, query, where, updateDoc, doc, orderBy, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { FaKey, FaUserCog, FaUsers, FaTrash, FaEye, FaFileExcel, FaCalendarDay, FaCalendarWeek, FaCalendarAlt, FaChartLine, FaBuilding, FaClipboardList } from 'react-icons/fa';
+import { FaKey, FaUserCog, FaUsers, FaTrash, FaEye, FaFileExcel, FaCalendarDay, FaCalendarWeek, FaCalendarAlt, FaChartLine, FaBuilding, FaClipboardList, FaPrint } from 'react-icons/fa';
 import * as XLSX from 'xlsx';
+import { sanitizeInput, validateLength } from '@/lib/utils';
 
 export default function AdminPanel() {
   const [authenticated, setAuthenticated] = useState(false);
@@ -22,6 +23,9 @@ export default function AdminPanel() {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [filteredGuests, setFilteredGuests] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   const [statistics, setStatistics] = useState({
     today: 0,
     yesterday: 0,
@@ -34,8 +38,8 @@ export default function AdminPanel() {
     peakHours: []
   });
 
-  // Password admin hardcoded (untuk keamanan lebih baik, simpan di environment variable)
-  const ADMIN_PASSWORD = 'admin123'; // Ganti dengan password yang kuat
+  // Password admin dari environment variable
+  const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'admin123';
 
   useEffect(() => {
     // Cek apakah sudah login sebelumnya
@@ -56,7 +60,8 @@ export default function AdminPanel() {
   useEffect(() => {
     applyFilter();
     calculateStatistics();
-  }, [guests, filterType, customStartDate, customEndDate]);
+    setCurrentPage(1); // Reset to page 1 when filter changes
+  }, [guests, filterType, customStartDate, customEndDate, searchQuery]);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -102,23 +107,48 @@ export default function AdminPanel() {
 
   const handleSetKeyword = async (e) => {
     e.preventDefault();
+
+    // Validasi input
+    if (!validateLength(keyword, 3, 50)) {
+      setMessage({ type: 'error', text: 'Kata kunci harus memiliki panjang 3-50 karakter.' });
+      return;
+    }
+
+    if (!validateLength(petugasPiket, 2, 100)) {
+      setMessage({ type: 'error', text: 'Nama petugas piket harus memiliki panjang 2-100 karakter.' });
+      return;
+    }
+
     setLoading(true);
 
     try {
+      // Sanitize input
+      const sanitizedKeyword = sanitizeInput(keyword);
+      const sanitizedPetugasPiket = sanitizeInput(petugasPiket);
+
+      // Nonaktifkan semua keyword yang aktif
+      const activeKeywordsQuery = query(collection(db, 'keywords'), where('active', '==', true));
+      const activeKeywordsSnapshot = await getDocs(activeKeywordsQuery);
+
+      const deactivatePromises = activeKeywordsSnapshot.docs.map(doc =>
+        updateDoc(doc.ref, { active: false })
+      );
+      await Promise.all(deactivatePromises);
+
       if (currentKeyword) {
-        // Update keyword yang sudah ada (tidak buat baru)
+        // Update keyword yang sudah ada
         await updateDoc(doc(db, 'keywords', currentKeyword.id), {
-          keyword: keyword.toLowerCase(),
-          petugasPiket: petugasPiket,
+          keyword: sanitizedKeyword.toLowerCase(),
+          petugasPiket: sanitizedPetugasPiket,
           active: true,
           updatedAt: new Date()
         });
         setMessage({ type: 'success', text: 'Kata kunci berhasil diperbarui!' });
       } else {
-        // Buat keyword baru (hanya jika belum ada sama sekali)
+        // Buat keyword baru
         await addDoc(collection(db, 'keywords'), {
-          keyword: keyword.toLowerCase(),
-          petugasPiket: petugasPiket,
+          keyword: sanitizedKeyword.toLowerCase(),
+          petugasPiket: sanitizedPetugasPiket,
           active: true,
           createdAt: new Date()
         });
@@ -126,7 +156,7 @@ export default function AdminPanel() {
       }
 
       fetchCurrentKeyword();
-      
+
       setTimeout(() => {
         setMessage({ type: '', text: '' });
       }, 3000);
@@ -166,6 +196,18 @@ export default function AdminPanel() {
   const applyFilter = () => {
     const now = new Date();
     let filtered = [...guests];
+
+    // Apply search filter first
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(guest =>
+        guest.nama?.toLowerCase().includes(query) ||
+        guest.perusahaan?.toLowerCase().includes(query) ||
+        guest.tujuan?.toLowerCase().includes(query) ||
+        guest.telepon?.includes(query) ||
+        guest.petugasPiket?.toLowerCase().includes(query)
+      );
+    }
 
     switch (filterType) {
       case 'today':
@@ -333,9 +375,9 @@ export default function AdminPanel() {
     const peakHours = Object.entries(hourCount)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .map(([hour, count]) => ({ 
-        hour: `${hour.padStart(2, '0')}:00 - ${(parseInt(hour) + 1).toString().padStart(2, '0')}:00`, 
-        count 
+      .map(([hour, count]) => ({
+        hour: `${hour.toString().padStart(2, '0')}:00 - ${(parseInt(hour) + 1).toString().padStart(2, '0')}:00`,
+        count
       }));
 
     setStatistics({
@@ -349,6 +391,122 @@ export default function AdminPanel() {
       topOfficers,
       peakHours
     });
+  };
+
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank');
+    const dataToExport = filteredGuests;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Laporan Buku Tamu - KPU Tasikmalaya</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+          }
+          h1 {
+            text-align: center;
+            color: #333;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 20px;
+          }
+          .info {
+            margin-bottom: 20px;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+          }
+          th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+          }
+          th {
+            background-color: #dc2626;
+            color: white;
+          }
+          tr:nth-child(even) {
+            background-color: #f9f9f9;
+          }
+          .footer {
+            margin-top: 40px;
+            text-align: right;
+          }
+          @media print {
+            button {
+              display: none;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Buku Tamu Digital</h1>
+          <h2>KPU Kabupaten Tasikmalaya</h2>
+        </div>
+        <div class="info">
+          <p><strong>Periode:</strong> ${getFilterLabel()}</p>
+          <p><strong>Total Pengunjung:</strong> ${dataToExport.length} orang</p>
+          <p><strong>Dicetak pada:</strong> ${new Date().toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}</p>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>No</th>
+              <th>Nama Lengkap</th>
+              <th>Telepon</th>
+              <th>Perusahaan/Instansi</th>
+              <th>Tujuan Kunjungan</th>
+              <th>Petugas Piket</th>
+              <th>Waktu Kunjungan</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${dataToExport.map((guest, index) => `
+              <tr>
+                <td>${index + 1}</td>
+                <td>${guest.nama}</td>
+                <td>${guest.telepon}</td>
+                <td>${guest.perusahaan}</td>
+                <td>${guest.tujuan}</td>
+                <td>${guest.petugasPiket}</td>
+                <td>${formatDate(guest.timestamp)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="footer">
+          <p>Tasikmalaya, ${new Date().toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+          })}</p>
+          <br><br>
+          <p>_______________________</p>
+          <p>Petugas</p>
+        </div>
+        <button onclick="window.print()" style="margin-top: 20px; padding: 10px 20px; background: #dc2626; color: white; border: none; border-radius: 5px; cursor: pointer;">
+          Cetak Dokumen
+        </button>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
   };
 
   const handleExportToExcel = () => {
@@ -464,6 +622,7 @@ export default function AdminPanel() {
 
             <button
               type="submit"
+              aria-label="Login ke Admin Panel"
               className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
             >
               Login
@@ -486,9 +645,12 @@ export default function AdminPanel() {
             </div>
             <button
               onClick={() => {
-                setAuthenticated(false);
-                sessionStorage.removeItem('adminLoggedIn');
+                if (confirm('Apakah Anda yakin ingin logout?')) {
+                  setAuthenticated(false);
+                  sessionStorage.removeItem('adminLoggedIn');
+                }
               }}
+              aria-label="Logout dari Admin Panel"
               className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition"
             >
               Logout
@@ -732,6 +894,14 @@ export default function AdminPanel() {
             </h2>
             <div className="flex gap-2">
               <button
+                onClick={handlePrint}
+                disabled={filteredGuests.length === 0}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FaPrint className="mr-2" />
+                Print
+              </button>
+              <button
                 onClick={handleExportToExcel}
                 disabled={filteredGuests.length === 0}
                 className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
@@ -747,6 +917,18 @@ export default function AdminPanel() {
                 {showGuests ? 'Sembunyikan' : 'Tampilkan'}
               </button>
             </div>
+          </div>
+
+          {/* Search Section */}
+          <div className="mb-4">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="🔍 Cari berdasarkan nama, perusahaan, tujuan, telepon, atau petugas..."
+              aria-label="Cari Data Tamu"
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
           </div>
 
           {/* Filter Section */}
@@ -818,8 +1000,14 @@ export default function AdminPanel() {
           </div>
 
           {showGuests && (
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            <>
+              {/* Pagination Info */}
+              <div className="mb-4 text-sm text-gray-600">
+                Menampilkan {Math.min((currentPage - 1) * itemsPerPage + 1, filteredGuests.length)} - {Math.min(currentPage * itemsPerPage, filteredGuests.length)} dari {filteredGuests.length} data
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full">
                 <thead>
                   <tr className="bg-gray-50">
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">No</th>
@@ -834,14 +1022,17 @@ export default function AdminPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {filteredGuests.map((guest, index) => (
+                  {filteredGuests
+                    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                    .map((guest, index) => (
                     <tr key={guest.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm">{index + 1}</td>
+                      <td className="px-4 py-3 text-sm">{(currentPage - 1) * itemsPerPage + index + 1}</td>
                       <td className="px-4 py-3">
                         {guest.photoURL ? (
-                          <img 
-                            src={guest.photoURL} 
+                          <img
+                            src={guest.photoURL}
                             alt={guest.nama}
+                            loading="lazy"
                             className="w-12 h-12 rounded-full object-cover cursor-pointer"
                             onClick={() => setSelectedGuest(guest)}
                           />
@@ -876,6 +1067,44 @@ export default function AdminPanel() {
                 </div>
               )}
             </div>
+
+            {/* Pagination Controls */}
+            {filteredGuests.length > itemsPerPage && (
+              <div className="mt-6 flex justify-center items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  ← Sebelumnya
+                </button>
+
+                <div className="flex gap-1">
+                  {Array.from({ length: Math.ceil(filteredGuests.length / itemsPerPage) }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-4 py-2 rounded-lg ${
+                        currentPage === page
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredGuests.length / itemsPerPage)))}
+                  disabled={currentPage === Math.ceil(filteredGuests.length / itemsPerPage)}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Selanjutnya →
+                </button>
+              </div>
+            )}
+            </>
           )}
         </div>
 
@@ -895,9 +1124,10 @@ export default function AdminPanel() {
                   ×
                 </button>
               </div>
-              <img 
-                src={selectedGuest.photoURL} 
+              <img
+                src={selectedGuest.photoURL}
                 alt={selectedGuest.nama}
+                loading="lazy"
                 className="w-full rounded-lg"
               />
               <div className="mt-4 space-y-2 text-sm">
