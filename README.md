@@ -90,9 +90,15 @@ NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
 NEXT_PUBLIC_ADMIN_PASSWORD=your_strong_password_here
+NEXT_PUBLIC_ADMIN_PATH=admin-kpu-2025
 ```
 
-**⚠️ PENTING**: Ganti `NEXT_PUBLIC_ADMIN_PASSWORD` dengan password yang kuat!
+**⚠️ PENTING**:
+- Ganti `NEXT_PUBLIC_ADMIN_PASSWORD` dengan password yang kuat!
+- **Ganti `NEXT_PUBLIC_ADMIN_PATH` dengan path unik pilihan Anda untuk keamanan ekstra!**
+  - Contoh: `kpu-dashboard-xyz`, `panel-tasikmalaya-2025`, atau kombinasi unik lainnya
+  - Jangan gunakan path umum seperti `admin`, `dashboard`, atau `panel`
+  - Path ini akan menjadi URL admin panel Anda: `https://domain.com/[path-anda]`
 
 ### 5. Setup Firestore Database
 
@@ -136,7 +142,9 @@ pnpm dev
 
 Buka [http://localhost:3000](http://localhost:3000) untuk halaman tamu.
 
-Buka [http://localhost:3000/admin](http://localhost:3000/admin) untuk panel admin.
+Buka `http://localhost:3000/[ADMIN_PATH]` untuk panel admin (sesuai dengan `NEXT_PUBLIC_ADMIN_PATH` di `.env.local`).
+
+Contoh: Jika `NEXT_PUBLIC_ADMIN_PATH=kpu-dashboard-2025`, maka akses di `http://localhost:3000/kpu-dashboard-2025`
 
 ## 📱 Penggunaan
 
@@ -152,9 +160,10 @@ Buka [http://localhost:3000/admin](http://localhost:3000/admin) untuk panel admi
 4. Masukkan **kata kunci** yang diberikan petugas
 5. Klik **"Kirim Kunjungan"**
 
-### Panel Admin (/admin)
+### Panel Admin (Custom Path)
 
-1. Login dengan password yang sudah diatur di `.env.local`
+1. Akses panel admin di URL custom yang Anda set di `NEXT_PUBLIC_ADMIN_PATH`
+2. Login dengan password yang sudah diatur di `.env.local`
 2. **Dashboard**: Lihat statistik pengunjung secara real-time
 3. **Atur Kata Kunci**: Update kata kunci harian dan nama petugas piket
 4. **Daftar Tamu**:
@@ -196,11 +205,23 @@ guestbook-kpu/
 
 ## 🔒 Keamanan
 
+- ✅ **Custom Admin Path** - URL admin panel bisa dikustomisasi via environment variable
 - ✅ Password admin disimpan di environment variable
 - ✅ Input validation dan sanitization
 - ✅ Kata kunci harian untuk akses form
 - ✅ Session-based admin authentication
+- ✅ Middleware protection - Block akses langsung ke internal admin
 - ✅ Firebase Security Rules (harus disetup manual)
+
+### Custom Admin Path Security
+
+Aplikasi ini menggunakan **custom admin path** untuk security by obscurity:
+
+- Path `/admin` otomatis redirect ke home page
+- Path internal `/admin-internal` tidak bisa diakses langsung
+- Admin panel hanya bisa diakses via path yang Anda set di `NEXT_PUBLIC_ADMIN_PATH`
+- **Rekomendasi**: Ganti path secara berkala untuk keamanan maksimal
+- Jangan share path admin Anda ke publik
 
 ### Recommended Firestore Security Rules
 
@@ -230,8 +251,18 @@ service cloud.firestore {
 
 1. Push code ke GitHub
 2. Import project di [Vercel](https://vercel.com)
-3. Tambahkan Environment Variables di Vercel Dashboard
+3. Tambahkan Environment Variables di Vercel Dashboard:
+   - `NEXT_PUBLIC_FIREBASE_API_KEY`
+   - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+   - `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+   - `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+   - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+   - `NEXT_PUBLIC_FIREBASE_APP_ID`
+   - `NEXT_PUBLIC_ADMIN_PASSWORD` (gunakan password yang kuat!)
+   - `NEXT_PUBLIC_ADMIN_PATH` (path unik untuk admin panel, contoh: `kpu-xyz-2025`)
 4. Deploy!
+
+**⚠️ PENTING**: Untuk production, gunakan admin path yang berbeda dari development untuk keamanan ekstra!
 
 ```bash
 npm run build
