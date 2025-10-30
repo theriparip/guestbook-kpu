@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 
 export function middleware(request) {
   const { pathname } = request.nextUrl;
-  console.log('ENV DEBUG →', process.env.NEXT_PUBLIC_ADMIN_PATH);
 
   // Get custom admin path from environment variable
   // Default to 'admin-kpu-2025' if not set
