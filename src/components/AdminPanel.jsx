@@ -736,14 +736,19 @@ export default function AdminPanel() {
             {statistics.topPurposes.length > 0 ? (
               <div className="space-y-3">
                 {statistics.topPurposes.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center flex-1">
-                      <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold mr-3">
+                  <div key={index} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center min-w-0 flex-1">
+                      <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold mr-2 flex-shrink-0">
                         {index + 1}
                       </span>
-                      <span className="text-sm text-gray-700 truncate">{item.name}</span>
+                      <span
+                        className="text-sm text-gray-700 truncate"
+                        title={item.name}
+                      >
+                        {item.name}
+                      </span>
                     </div>
-                    <span className="ml-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                    <span className="ml-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0">
                       {item.count}
                     </span>
                   </div>
@@ -763,14 +768,19 @@ export default function AdminPanel() {
             {statistics.topCompanies.length > 0 ? (
               <div className="space-y-3">
                 {statistics.topCompanies.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center flex-1">
-                      <span className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs font-bold mr-3">
+                  <div key={index} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center min-w-0 flex-1">
+                      <span className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs font-bold mr-2 flex-shrink-0">
                         {index + 1}
                       </span>
-                      <span className="text-sm text-gray-700 truncate">{item.name}</span>
+                      <span
+                        className="text-sm text-gray-700 truncate"
+                        title={item.name}
+                      >
+                        {item.name}
+                      </span>
                     </div>
-                    <span className="ml-2 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
+                    <span className="ml-2 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0">
                       {item.count}
                     </span>
                   </div>
@@ -790,14 +800,19 @@ export default function AdminPanel() {
             {statistics.topOfficers.length > 0 ? (
               <div className="space-y-3 mb-6">
                 {statistics.topOfficers.slice(0, 3).map((item, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center flex-1">
-                      <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-bold mr-3">
+                  <div key={index} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center min-w-0 flex-1">
+                      <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-bold mr-2 flex-shrink-0">
                         {index + 1}
                       </span>
-                      <span className="text-sm text-gray-700 truncate">{item.name}</span>
+                      <span
+                        className="text-sm text-gray-700 truncate"
+                        title={item.name}
+                      >
+                        {item.name}
+                      </span>
                     </div>
-                    <span className="ml-2 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold">
+                    <span className="ml-2 px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0">
                       {item.count}
                     </span>
                   </div>
